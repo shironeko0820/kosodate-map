@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>子育て支援マップ｜自治体の子育て施策を地図で比較</title>
+  <meta name="description" content="全国主要市区町村の子育て支援施策を地図で比較。医療費助成・給食費無償化・待機児童数・移住支援金を自治体間で比較できます。">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #2e7d32;
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      position: relative;
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+    header h1 { font-size: 18px; font-weight: 700; flex-shrink: 0; }
+
+    .search-bar {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      max-width: 500px;
+      align-items: center;
+    }
+    .search-bar select,
+    .search-bar input {
+      padding: 7px 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-bar select { width: 140px; background: white; cursor: pointer; }
+    .search-bar input { flex: 1; background: white; }
+    .search-bar button {
+      padding: 7px 12px;
+      background: #1b5e20;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .search-bar button:hover { background: #2e7d32; }
+    #resetBtn { background: #c62828 !important; }
+    #resetBtn:hover { background: #b71c1c !important; }
+
+    /* 指標セレクター */
+    .metric-bar {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .metric-btn {
+      padding: 5px 10px;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 4px;
+      background: transparent;
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .metric-btn.active { background: rgba(255,255,255,0.25); border-color: white; font-weight: 700; }
+    .metric-btn:hover { background: rgba(255,255,255,0.15); }
+
+    #rankingBtn {
+      background: #f57c00;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 7px 12px;
+      flex-shrink: 0;
+    }
+    #rankingBtn:hover { background: #e65100; }
+
+    #stats { color: rgba(255,255,255,0.85); font-size: 12px; flex-shrink: 0; }
+
+    #map { width: 100%; flex: 1; min-height: 0; }
+
+    /* ローディング */
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 1000; gap: 16px;
+    }
+    #loading.hidden { display: none; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #2e7d32;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title { font-size: 17px; font-weight: 700; color: #2e7d32; }
+
+    /* 凡例 */
+    #legend {
+      position: absolute;
+      bottom: 32px;
+      left: 10px;
+      background: white;
+      border-radius: 8px;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 12px;
+      z-index: 5;
+      min-width: 180px;
+    }
+    #legend h4 { font-size: 12px; color: #555; margin-bottom: 6px; }
+    .legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .legend-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%; flex-shrink: 0;
+    }
+    #dataNote {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      font-size: 10px;
+      color: #888;
+      z-index: 5;
+    }
+
+    /* InfoWindow */
+    .gm-style .gm-style-iw-c { border-radius: 8px !important; padding: 0 !important; max-width: 280px !important; }
+    .gm-style .gm-style-iw-d { overflow: hidden !important; }
+    .info-window { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; min-width: 230px; }
+    .iw-header { background: #2e7d32; color: white; padding: 10px 14px; }
+    .iw-header h3 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .iw-header .pref { font-size: 11px; opacity: 0.85; }
+    .iw-body { padding: 10px 14px 12px; }
+    .iw-row {
+      display: flex; align-items: flex-start;
+      gap: 6px; margin-bottom: 7px;
+      font-size: 12px; line-height: 1.5;
+    }
+    .iw-row .icon { width: 18px; flex-shrink: 0; text-align: center; font-size: 14px; }
+    .iw-row .label { color: #666; width: 90px; flex-shrink: 0; }
+    .iw-row .value { color: #333; font-weight: 600; }
+    .badge-good { color: #2e7d32; }
+    .badge-warn { color: #e65100; }
+    .badge-neutral { color: #555; }
+
+    /* ランキングパネル */
+    #rankingPanel {
+      position: fixed;
+      top: 0; right: -100%;
+      width: min(95vw, 720px);
+      height: 100%;
+      background: white;
+      box-shadow: -3px 0 12px rgba(0,0,0,0.15);
+      z-index: 200;
+      display: flex; flex-direction: column;
+      transition: right 0.3s ease;
+    }
+    #rankingPanel.open { right: 0; }
+    .rk-header {
+      background: #2e7d32;
+      color: white;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .rk-header h3 { font-size: 16px; font-weight: 700; }
+    .rk-close {
+      background: none; border: none; color: white;
+      font-size: 20px; cursor: pointer; padding: 0 4px;
+    }
+    .rk-toolbar {
+      display: flex; gap: 8px; align-items: center;
+      padding: 10px 14px; background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0; flex-shrink: 0; flex-wrap: wrap;
+    }
+    .rk-toolbar select {
+      padding: 5px 8px; border: 1px solid #ccc;
+      border-radius: 4px; font-size: 13px;
+    }
+    .rk-count { font-size: 12px; color: #888; }
+    .rk-legend {
+      padding: 8px 14px; background: #e8f5e9;
+      border-bottom: 1px solid #c8e6c9;
+      font-size: 11px; color: #2e7d32;
+      display: flex; flex-direction: column; gap: 3px;
+      flex-shrink: 0;
+    }
+    .rk-table-wrap { flex: 1; overflow-y: auto; }
+    .rk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .rk-table thead { position: sticky; top: 0; background: white; z-index: 1; }
+    .rk-table th {
+      padding: 8px 6px; text-align: center;
+      border-bottom: 2px solid #e0e0e0;
+      cursor: pointer; user-select: none;
+      white-space: nowrap; color: #555;
+    }
+    .rk-table th:hover { background: #f5f5f5; }
+    .rk-table th.sorted { color: #2e7d32; }
+    .rk-table td {
+      padding: 7px 6px; border-bottom: 1px solid #f0f0f0;
+      text-align: center; vertical-align: middle;
+    }
+    .rk-table tr:hover td { background: #f9fbe7; }
+    .rk-table .td-name { text-align: left; font-weight: 600; }
+    .rk-table .td-rank { color: #888; width: 36px; }
+    .chip {
+      display: inline-block; padding: 2px 7px;
+      border-radius: 10px; font-size: 11px; font-weight: 700;
+    }
+    .chip-good { background: #e8f5e9; color: #2e7d32; }
+    .chip-warn { background: #fff3e0; color: #e65100; }
+    .chip-bad { background: #ffebee; color: #c62828; }
+    .chip-neutral { background: #f5f5f5; color: #757575; }
+
+    @media (max-width: 600px) {
+      header { padding: 8px 10px; gap: 8px; }
+      header h1 { font-size: 14px; }
+      .metric-btn { font-size: 11px; padding: 4px 7px; }
+      .search-bar select { width: 110px; }
+      #legend { font-size: 11px; padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ランキングパネル -->
+<div id="rankingPanel">
+  <div class="rk-header">
+    <h3>👶 子育て支援 一覧・比較</h3>
+    <button class="rk-close" onclick="closeRanking()">✕</button>
+  </div>
+  <div class="rk-toolbar">
+    <select id="rkPrefFilter" onchange="renderRanking()">
+      <option value="">全国</option>
+    </select>
+    <span class="rk-count" id="rkCount"></span>
+  </div>
+  <div class="rk-legend">
+    <span>🏥 <b>医療費助成</b>：上限年齢（通院）。高校卒業まで=18歳</span>
+    <span>🍱 <b>給食費</b>：小中学校の学校給食費が無償かどうか</span>
+    <span>👶 <b>待機児童</b>：保育所等の待機児童数（2023年4月1日時点）</span>
+    <span>🏠 <b>移住支援金</b>：移住者への支援金（子育て加算別途あり）</span>
+  </div>
+  <div class="rk-table-wrap">
+    <table class="rk-table">
+      <thead>
+        <tr>
+          <th class="td-rank">#</th>
+          <th onclick="sortRanking('name')" id="th-name">自治体名</th>
+          <th onclick="sortRanking('pref')" id="th-pref">都道府県</th>
+          <th onclick="sortRanking('medicalAidAge')" id="th-med">🏥 医療費</th>
+          <th onclick="sortRanking('lunchFree')" id="th-lunch">🍱 給食費</th>
+          <th onclick="sortRanking('waitingChildren')" id="th-wait">👶 待機児童</th>
+          <th onclick="sortRanking('migrationAmount')" id="th-mig">🏠 移住支援</th>
+        </tr>
+      </thead>
+      <tbody id="rkBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ローディング -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-title">子育て支援データを読み込み中...</div>
+</div>
+
+<header>
+  <h1>👶 子育て支援マップ</h1>
+  <div class="search-bar">
+    <select id="prefSelect">
+      <option value="">都道府県を選択</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="市区町村で検索...">
+    <button onclick="doSearch()">検索</button>
+    <button id="resetBtn" onclick="resetMap()">リセット</button>
+  </div>
+  <div class="metric-bar">
+    <button class="metric-btn" data-metric="waitingChildren" onclick="setMetric('waitingChildren')">👶 待機児童</button>
+    <button class="metric-btn" data-metric="lunchFree" onclick="setMetric('lunchFree')">🍱 給食費</button>
+    <button class="metric-btn" data-metric="medicalAidAge" onclick="setMetric('medicalAidAge')">🏥 医療費</button>
+    <button class="metric-btn" data-metric="migrationAmount" onclick="setMetric('migrationAmount')">🏠 移住支援</button>
+  </div>
+  <button id="rankingBtn" onclick="openRanking()">🔢 一覧・比較</button>
+  <div id="stats"></div>
+</header>
+
+<div id="map"></div>
+
+<!-- 凡例 -->
+<div id="legend"></div>
+<div id="dataNote">※ データ出典：厚労省・文科省・内閣府各種統計（主に2023年度）。詳細は各自治体公式サイトをご確認ください。</div>
+
+<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+
+<script>
+const DATA_URL = './kosodate_data.json';
+let map, clusterer, infoWindow;
+let allCities = [];
+let currentMetric = 'waitingChildren';
+let sortKey = 'waitingChildren';
+let sortAsc = true;
+
+/* ─── マーカー色設定 ─── */
+const METRICS = {
+  waitingChildren: {
+    label: '👶 待機児童数',
+    color: c => c === 0 ? '#43a047' : c <= 10 ? '#fdd835' : c <= 30 ? '#fb8c00' : '#e53935',
+    legend: [
+      { color:'#43a047', text:'0人（待機なし）' },
+      { color:'#fdd835', text:'1〜10人' },
+      { color:'#fb8c00', text:'11〜30人' },
+      { color:'#e53935', text:'31人以上' },
+    ]
+  },
+  lunchFree: {
+    label: '🍱 給食費無償化',
+    color: c => c ? '#43a047' : '#90a4ae',
+    legend: [
+      { color:'#43a047', text:'無償化済み' },
+      { color:'#90a4ae', text:'有償' },
+    ]
+  },
+  medicalAidAge: {
+    label: '🏥 医療費助成 上限年齢',
+    color: c => c >= 18 ? '#43a047' : c >= 15 ? '#fdd835' : c >= 12 ? '#fb8c00' : '#e53935',
+    legend: [
+      { color:'#43a047', text:'18歳（高校卒業）まで' },
+      { color:'#fdd835', text:'15歳（中学卒業）まで' },
+      { color:'#fb8c00', text:'12歳（小学卒業）まで' },
+      { color:'#e53935', text:'それ以下' },
+    ]
+  },
+  migrationAmount: {
+    label: '🏠 移住支援金',
+    color: c => c >= 130 ? '#1565c0' : c >= 100 ? '#43a047' : '#90a4ae',
+    legend: [
+      { color:'#1565c0', text:'130万円以上' },
+      { color:'#43a047', text:'100万円（基本額）' },
+      { color:'#90a4ae', text:'対象外' },
+    ]
+  }
+};
+
+/* ─── SVGマーカー生成 ─── */
+function makeMarkerIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20S24 21 24 12C24 5.37 18.63 0 12 0z" fill="${color}" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
+  </svg>`;
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(24, 32),
+    anchor: new google.maps.Point(12, 32),
+  };
+}
+
+/* ─── Google Maps 初期化 ─── */
+async function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 36.5, lng: 137.5 },
+    zoom: 5,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true,
+    styles: [{ featureType: "poi.business", stylers: [{ visibility: "off" }] }]
+  });
+  infoWindow = new google.maps.InfoWindow();
+
+  try {
+    const res = await fetch(DATA_URL);
+    allCities = await res.json();
+  } catch(e) {
+    console.error('データ読み込みエラー:', e);
+    allCities = [];
+  }
+
+  buildPrefSelect();
+  setMetric('waitingChildren');
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('stats').textContent = `${allCities.length} 自治体`;
+}
+
+/* ─── 指標切り替え ─── */
+function setMetric(metric) {
+  currentMetric = metric;
+  document.querySelectorAll('.metric-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.metric === metric);
+  });
+  renderMarkers(allCities);
+  renderLegend();
+}
+
+/* ─── 凡例描画 ─── */
+function renderLegend() {
+  const m = METRICS[currentMetric];
+  const legend = document.getElementById('legend');
+  legend.innerHTML = `<h4>${m.label}</h4>` +
+    m.legend.map(l =>
+      `<div class="legend-row"><div class="legend-dot" style="background:${l.color}"></div><span>${l.text}</span></div>`
+    ).join('');
+}
+
+/* ─── マーカー描画 ─── */
+function renderMarkers(cities) {
+  if (clusterer) clusterer.clearMarkers();
+
+  const m = METRICS[currentMetric];
+  const markers = cities.map(city => {
+    const val = city[currentMetric];
+    const color = m.color(val);
+    const marker = new google.maps.Marker({
+      position: { lat: city.lat, lng: city.lng },
+      title: city.name,
+      icon: makeMarkerIcon(color),
+    });
+    marker.addListener('click', () => openInfo(marker, city));
+    return marker;
+  });
+
+  clusterer = new markerClusterer.MarkerClusterer({
+    map,
+    markers,
+    renderer: {
+      render({ count, position }) {
+        return new google.maps.Marker({
+          position,
+          label: { text: String(count), color: 'white', fontSize: '12px', fontWeight: '700' },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#2e7d32', fillOpacity: 0.85,
+            strokeColor: 'white', strokeWeight: 2,
+            scale: 18 + Math.min(count, 30),
+          },
+          zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count,
+        });
+      }
+    }
+  });
+}
+
+/* ─── ポップアップ ─── */
+function openInfo(marker, city) {
+  const medLabel = city.medicalAidAge >= 18 ? `${city.medicalAidAge}歳まで（高校卒業）` :
+                   city.medicalAidAge >= 15 ? `${city.medicalAidAge}歳まで（中学卒業）` :
+                   `${city.medicalAidAge}歳まで（小学卒業）`;
+  const medClass = city.medicalAidAge >= 18 ? 'badge-good' : city.medicalAidAge >= 15 ? 'badge-neutral' : 'badge-warn';
+
+  const lunchLabel = city.lunchFree ? '無償化済み ✓' : '有償';
+  const lunchClass = city.lunchFree ? 'badge-good' : 'badge-neutral';
+
+  const waitLabel = city.waitingChildren === 0 ? '0人（待機なし）' : `${city.waitingChildren}人（${city.waitingChildrenYear}年4月）`;
+  const waitClass = city.waitingChildren === 0 ? 'badge-good' : city.waitingChildren <= 10 ? 'badge-neutral' : 'badge-warn';
+
+  const migLabel = city.migrationSupport
+    ? `最大 ${city.migrationAmount}万円〜（+子加算あり）`
+    : '対象外';
+  const migClass = city.migrationSupport ? 'badge-good' : 'badge-neutral';
+
+  infoWindow.setContent(`
+    <div class="info-window">
+      <div class="iw-header">
+        <h3>${city.name}</h3>
+        <div class="pref">${city.pref}</div>
+      </div>
+      <div class="iw-body">
+        <div class="iw-row">
+          <div class="icon">🏥</div>
+          <div class="label">医療費助成</div>
+          <div class="value ${medClass}">${medLabel}</div>
+        </div>
+        <div class="iw-row">
+          <div class="icon">🍱</div>
+          <div class="label">給食費</div>
+          <div class="value ${lunchClass}">${lunchLabel}</div>
+        </div>
+        <div class="iw-row">
+          <div class="icon">👶</div>
+          <div class="label">待機児童数</div>
+          <div class="value ${waitClass}">${waitLabel}</div>
+        </div>
+        <div class="iw-row">
+          <div class="icon">🏠</div>
+          <div class="label">移住支援金</div>
+          <div class="value ${migClass}">${migLabel}</div>
+        </div>
+      </div>
+    </div>
+  `);
+  infoWindow.open(map, marker);
+}
+
+/* ─── 都道府県セレクト生成 ─── */
+function buildPrefSelect() {
+  const prefs = [...new Set(allCities.map(c => c.pref))].sort();
+  const sel = document.getElementById('prefSelect');
+  prefs.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+  // ランキングパネル用
+  const rkSel = document.getElementById('rkPrefFilter');
+  prefs.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    rkSel.appendChild(opt);
+  });
+}
+
+/* ─── 検索 ─── */
+function doSearch() {
+  const pref = document.getElementById('prefSelect').value;
+  const q = document.getElementById('searchInput').value.trim();
+  let results = allCities;
+  if (pref) results = results.filter(c => c.pref === pref);
+  if (q) results = results.filter(c => c.name.includes(q) || c.pref.includes(q));
+  renderMarkers(results);
+  if (results.length === 1) {
+    const c = results[0];
+    map.setCenter({ lat: c.lat, lng: c.lng });
+    map.setZoom(12);
+  } else if (results.length > 0 && pref) {
+    map.setZoom(8);
+  }
+}
+
+function resetMap() {
+  document.getElementById('prefSelect').value = '';
+  document.getElementById('searchInput').value = '';
+  renderMarkers(allCities);
+  map.setCenter({ lat: 36.5, lng: 137.5 });
+  map.setZoom(5);
+}
+
+/* ─── ランキングパネル ─── */
+function openRanking() {
+  renderRanking();
+  document.getElementById('rankingPanel').classList.add('open');
+}
+function closeRanking() {
+  document.getElementById('rankingPanel').classList.remove('open');
+}
+
+function renderRanking() {
+  const pref = document.getElementById('rkPrefFilter').value;
+  let cities = pref ? allCities.filter(c => c.pref === pref) : [...allCities];
+
+  // ソート
+  cities.sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (typeof va === 'boolean') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+    return sortAsc ? (va > vb ? 1 : va < vb ? -1 : 0) : (va < vb ? 1 : va > vb ? -1 : 0);
+  });
+
+  document.getElementById('rkCount').textContent = `${cities.length}件`;
+
+  const tbody = document.getElementById('rkBody');
+  tbody.innerHTML = cities.map((c, i) => {
+    const medChip = c.medicalAidAge >= 18
+      ? `<span class="chip chip-good">${c.medicalAidAge}歳</span>`
+      : c.medicalAidAge >= 15
+      ? `<span class="chip chip-warn">${c.medicalAidAge}歳</span>`
+      : `<span class="chip chip-bad">${c.medicalAidAge}歳</span>`;
+
+    const lunchChip = c.lunchFree
+      ? `<span class="chip chip-good">無償</span>`
+      : `<span class="chip chip-neutral">有償</span>`;
+
+    const waitChip = c.waitingChildren === 0
+      ? `<span class="chip chip-good">0人</span>`
+      : c.waitingChildren <= 10
+      ? `<span class="chip chip-warn">${c.waitingChildren}人</span>`
+      : `<span class="chip chip-bad">${c.waitingChildren}人</span>`;
+
+    const migChip = c.migrationSupport
+      ? `<span class="chip chip-good">${c.migrationAmount}万円〜</span>`
+      : `<span class="chip chip-neutral">対象外</span>`;
+
+    return `<tr onclick="focusCity(${allCities.indexOf(c)})">
+      <td class="td-rank">${i + 1}</td>
+      <td class="td-name">${c.name}</td>
+      <td>${c.pref}</td>
+      <td>${medChip}</td>
+      <td>${lunchChip}</td>
+      <td>${waitChip}</td>
+      <td>${migChip}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortRanking(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  // ソートされたヘッダーを強調
+  document.querySelectorAll('.rk-table th').forEach(th => th.classList.remove('sorted'));
+  const thMap = { name:'th-name', pref:'th-pref', medicalAidAge:'th-med', lunchFree:'th-lunch', waitingChildren:'th-wait', migrationAmount:'th-mig' };
+  if (thMap[key]) document.getElementById(thMap[key])?.classList.add('sorted');
+  renderRanking();
+}
+
+function focusCity(idx) {
+  const c = allCities[idx];
+  closeRanking();
+  map.setCenter({ lat: c.lat, lng: c.lng });
+  map.setZoom(13);
+}
+</script>
+
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD4myQ-yye_b-uoEQEk_Bntf3nS_00YSWc&callback=initMap&language=ja"
+  async defer>
+</script>
+
+</body>
+</html>
