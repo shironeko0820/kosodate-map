@@ -260,7 +260,7 @@
   </div>
   <div class="rk-legend">
     <span>🏥 <b>医療費助成</b>：上限年齢（通院）。高校卒業まで=18歳</span>
-    <span>🍱 <b>給食費</b>：小中学校の学校給食費が無償かどうか</span>
+    <span>🍱 <b>給食費</b>：小中学校の学校給食費が完全無償かどうか（出典: 文科省R5年9月調査・青森県R6年10月・東京都R6年度。グレーは未確認）</span>
     <span>👶 <b>待機児童</b>：保育所等の待機児童数（2023年4月1日時点）</span>
     <span>🏠 <b>移住支援金</b>：移住者への支援金（子育て加算別途あり）</span>
   </div>
@@ -341,7 +341,7 @@ const METRICS = {
     color: c => c ? '#43a047' : '#90a4ae',
     legend: [
       { color:'#43a047', text:'無償化済み' },
-      { color:'#90a4ae', text:'有償' },
+      { color:'#90a4ae', text:'未確認' },
     ]
   },
   medicalAidAge: {
@@ -469,7 +469,7 @@ function openInfo(marker, city) {
                    `${city.medicalAidAge}歳まで（小学卒業）`;
   const medClass = city.medicalAidAge >= 18 ? 'badge-good' : city.medicalAidAge >= 15 ? 'badge-neutral' : 'badge-warn';
 
-  const lunchLabel = city.lunchFree ? '無償化済み ✓' : '有償';
+  const lunchLabel = city.lunchFree ? '無償化済み ✓' : '未確認';
   const lunchClass = city.lunchFree ? 'badge-good' : 'badge-neutral';
 
   const waitLabel = city.waitingChildren === 0 ? '0人（待機なし）' : `${city.waitingChildren}人（${city.waitingChildrenYear}年4月）`;
@@ -598,7 +598,7 @@ function renderRanking() {
 
     const lunchChip = c.lunchFree
       ? `<span class="chip chip-good">無償</span>`
-      : `<span class="chip chip-neutral">有償</span>`;
+      : `<span class="chip chip-neutral">未確認</span>`;
 
     const waitChip = c.waitingChildren === 0
       ? `<span class="chip chip-good">0人</span>`

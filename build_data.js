@@ -76,18 +76,36 @@ const FALLBACK_COORDS = {
   "沖縄県_与那国町":  [24.4668, 122.9990],
 };
 
+// 3c. 給食費無償化の確認済み自治体セット
+const lunchFreeRaw = JSON.parse(fs.readFileSync('./lunch_free_known.json', 'utf-8'));
+const lunchFreeSet = new Set(lunchFreeRaw.map(r => `${r.pref}_${r.name}`));
+// 郡名除去 + ヶ/ケ正規化でマッチングするヘルパー
+function lunchFreeKey(pref, name) {
+  const variants = new Set();
+  for (const n of [name, name.replace(/^.+郡/, '')]) {
+    variants.add(n);
+    variants.add(n.replace(/ヶ/g, 'ケ'));
+    variants.add(n.replace(/ケ/g, 'ヶ'));
+  }
+  for (const n of variants) {
+    if (lunchFreeSet.has(`${pref}_${n}`)) return true;
+  }
+  return false;
+}
+
 // 4. マージしてkosodate_data.jsonを構築
 const kosodateData = [];
 for (const [key, muni] of Object.entries(muniMap)) {
   const waitKey = `${muni.pref}_${muni.name}`;
   const waitingChildren = waitingMap[waitKey] || 0;
+  const lunchFree = lunchFreeKey(muni.pref, muni.name);
   kosodateData.push({
     name: muni.name,
     pref: muni.pref,
     lat: muni.lat,
     lng: muni.lng,
     medicalAidAge: 18,
-    lunchFree: false,
+    lunchFree,
     waitingChildren,
     waitingChildrenYear: 2024,
     migrationSupport: false,
@@ -101,13 +119,14 @@ for (const w of waitingRaw) {
   if (muniMap[key]) continue; // 既に追加済み
   const coords = FALLBACK_COORDS[key];
   if (!coords) continue; // 座標不明はスキップ
+  const lunchFree = lunchFreeSet.has(key);
   kosodateData.push({
     name: w.name,
     pref: w.pref,
     lat: coords[0],
     lng: coords[1],
     medicalAidAge: 18,
-    lunchFree: false,
+    lunchFree,
     waitingChildren: w.waitingChildren,
     waitingChildrenYear: 2024,
     migrationSupport: false,
