@@ -82,6 +82,27 @@ const lunchFreeSet = new Set(lunchFreeRaw.map(r => `${r.pref}_${r.name}`));
 
 // 3d. 医療費助成 都道府県別基準値（こども家庭庁 令和6年4月1日時点）
 const medicalAidPref = JSON.parse(fs.readFileSync('./medical_aid_pref.json', 'utf-8'));
+
+// 3e. 医療費助成 市区別実データ（goo.ne.jp 住宅情報）
+const medicalAidCityRaw = JSON.parse(fs.readFileSync('./medical_aid_city.json', 'utf-8'));
+const medicalAidCityMap = {};
+for (const r of medicalAidCityRaw) {
+  medicalAidCityMap[`${r.pref}_${r.name}`] = r.age;
+}
+// 市区名のバリアント（ヶ/ケ・郡名除去）でマッチするヘルパー
+function getMedicalAidAge(pref, name) {
+  const variants = new Set();
+  for (const n of [name, name.replace(/^.+郡/, '')]) {
+    variants.add(n);
+    variants.add(n.replace(/ヶ/g, 'ケ'));
+    variants.add(n.replace(/ケ/g, 'ヶ'));
+  }
+  for (const n of variants) {
+    const v = medicalAidCityMap[`${pref}_${n}`];
+    if (v !== undefined) return v;
+  }
+  return medicalAidPref[pref] ?? 18; // フォールバック：都道府県基準値
+}
 // 郡名除去 + ヶ/ケ正規化でマッチングするヘルパー
 function lunchFreeKey(pref, name) {
   const variants = new Set();
@@ -102,7 +123,7 @@ for (const [key, muni] of Object.entries(muniMap)) {
   const waitKey = `${muni.pref}_${muni.name}`;
   const waitingChildren = waitingMap[waitKey] || 0;
   const lunchFree = lunchFreeKey(muni.pref, muni.name);
-  const medicalAidAge = medicalAidPref[muni.pref] ?? 18;
+  const medicalAidAge = getMedicalAidAge(muni.pref, muni.name);
   kosodateData.push({
     name: muni.name,
     pref: muni.pref,
@@ -124,7 +145,7 @@ for (const w of waitingRaw) {
   const coords = FALLBACK_COORDS[key];
   if (!coords) continue; // 座標不明はスキップ
   const lunchFree = lunchFreeSet.has(key);
-  const medicalAidAge = medicalAidPref[w.pref] ?? 18;
+  const medicalAidAge = getMedicalAidAge(w.pref, w.name);
   kosodateData.push({
     name: w.name,
     pref: w.pref,
