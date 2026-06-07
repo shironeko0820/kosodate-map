@@ -79,6 +79,9 @@ const FALLBACK_COORDS = {
 // 3c. 給食費無償化の確認済み自治体セット
 const lunchFreeRaw = JSON.parse(fs.readFileSync('./lunch_free_known.json', 'utf-8'));
 const lunchFreeSet = new Set(lunchFreeRaw.map(r => `${r.pref}_${r.name}`));
+
+// 3d. 医療費助成 都道府県別基準値（こども家庭庁 令和6年4月1日時点）
+const medicalAidPref = JSON.parse(fs.readFileSync('./medical_aid_pref.json', 'utf-8'));
 // 郡名除去 + ヶ/ケ正規化でマッチングするヘルパー
 function lunchFreeKey(pref, name) {
   const variants = new Set();
@@ -99,12 +102,13 @@ for (const [key, muni] of Object.entries(muniMap)) {
   const waitKey = `${muni.pref}_${muni.name}`;
   const waitingChildren = waitingMap[waitKey] || 0;
   const lunchFree = lunchFreeKey(muni.pref, muni.name);
+  const medicalAidAge = medicalAidPref[muni.pref] ?? 18;
   kosodateData.push({
     name: muni.name,
     pref: muni.pref,
     lat: muni.lat,
     lng: muni.lng,
-    medicalAidAge: 18,
+    medicalAidAge,
     lunchFree,
     waitingChildren,
     waitingChildrenYear: 2024,
@@ -120,12 +124,13 @@ for (const w of waitingRaw) {
   const coords = FALLBACK_COORDS[key];
   if (!coords) continue; // 座標不明はスキップ
   const lunchFree = lunchFreeSet.has(key);
+  const medicalAidAge = medicalAidPref[w.pref] ?? 18;
   kosodateData.push({
     name: w.name,
     pref: w.pref,
     lat: coords[0],
     lng: coords[1],
-    medicalAidAge: 18,
+    medicalAidAge,
     lunchFree,
     waitingChildren: w.waitingChildren,
     waitingChildrenYear: 2024,

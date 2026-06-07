@@ -259,7 +259,7 @@
     <span class="rk-count" id="rkCount"></span>
   </div>
   <div class="rk-legend">
-    <span>🏥 <b>医療費助成</b>：上限年齢（通院）。高校卒業まで=18歳</span>
+    <span>🏥 <b>医療費助成</b>：通院上限年齢（出典: こども家庭庁 令和6年4月調査・都道府県基準値を表示。各市区町村が独自に上乗せしている場合があります）</span>
     <span>🍱 <b>給食費</b>：小中学校の学校給食費が完全無償かどうか（出典: 文科省R5年9月調査・青森県R6年10月・東京都R6年度。グレーは未確認）</span>
     <span>👶 <b>待機児童</b>：保育所等の待機児童数（2023年4月1日時点）</span>
     <span>🏠 <b>移住支援金</b>：移住者への支援金（子育て加算別途あり）</span>
@@ -351,7 +351,7 @@ const METRICS = {
       { color:'#43a047', text:'18歳（高校卒業）まで' },
       { color:'#fdd835', text:'15歳（中学卒業）まで' },
       { color:'#fb8c00', text:'12歳（小学卒業）まで' },
-      { color:'#e53935', text:'それ以下' },
+      { color:'#e53935', text:'就学前以下' },
     ]
   },
   migrationAmount: {
@@ -466,7 +466,10 @@ function renderMarkers(cities) {
 function openInfo(marker, city) {
   const medLabel = city.medicalAidAge >= 18 ? `${city.medicalAidAge}歳まで（高校卒業）` :
                    city.medicalAidAge >= 15 ? `${city.medicalAidAge}歳まで（中学卒業）` :
-                   `${city.medicalAidAge}歳まで（小学卒業）`;
+                   city.medicalAidAge >= 12 ? `${city.medicalAidAge}歳まで（小学卒業）` :
+                   city.medicalAidAge >= 6  ? `就学前まで（都道府県基準）` :
+                   city.medicalAidAge >  0  ? `${city.medicalAidAge}歳まで（都道府県基準）` :
+                   '都道府県基準なし';
   const medClass = city.medicalAidAge >= 18 ? 'badge-good' : city.medicalAidAge >= 15 ? 'badge-neutral' : 'badge-warn';
 
   const lunchLabel = city.lunchFree ? '無償化済み ✓' : '未確認';
