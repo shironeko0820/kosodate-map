@@ -20,12 +20,17 @@ function getMuniName(officeName) {
   const cityBranch = officeName.match(/^(.+市).+区役所$/);
   if (cityBranch) return cityBranch[1];
   // 通常パターン
-  return officeName
+  let name = officeName
     .replace(/市役所$/, '市')
     .replace(/区役所$/, '区')
     .replace(/町役場$/, '町')
     .replace(/村役場$/, '村')
     .replace(/(役場|役所)$/, '');
+  // 郡名プレフィックスを除去（町・村のみ。市は「大和郡山市」「小郡市」など郡が固有名の一部のため除外）
+  if (name.endsWith('町') || name.endsWith('村')) {
+    name = name.replace(/^.+郡/, '');
+  }
+  return name;
 }
 
 const muniMap = {}; // key: "pref_muniName" → {name, pref, lat, lng}
@@ -83,13 +88,29 @@ const lunchFreeSet = new Set(lunchFreeRaw.map(r => `${r.pref}_${r.name}`));
 // 3d. 医療費助成 都道府県別基準値（こども家庭庁 令和6年4月1日時点）
 const medicalAidPref = JSON.parse(fs.readFileSync('./medical_aid_pref.json', 'utf-8'));
 
-// 3e. 医療費助成 市区別実データ（goo.ne.jp 住宅情報）
+// 3e. 医療費助成 手動確認済みデータ（medical_aid_sources.csv）
+// フォーマット: jiscode,pref,name,medicalAidAge,sourceUrl,confirmedDate,notes
+const sourcesRaw = fs.readFileSync('./medical_aid_sources.csv', 'utf-8');
+const sourcesMap = {}; // "pref_name" → { age, url }
+for (const line of sourcesRaw.split('\n').slice(1)) { // ヘッダー行スキップ
+  const cols = line.split(',');
+  if (cols.length < 4) continue;
+  const [jiscode, pref, name, ageStr] = cols;
+  const age = parseInt(ageStr);
+  const url = cols[4] || '';
+  if (!pref || !name || isNaN(age)) continue; // 未確認行はスキップ
+  sourcesMap[`${pref}_${name}`] = { age, url };
+}
+console.log(`medical_aid_sources.csv: ${Object.keys(sourcesMap).length}件読み込み`);
+
+// 3f. 医療費助成 市区別実データ（goo.ne.jp 住宅情報）
 const medicalAidCityRaw = JSON.parse(fs.readFileSync('./medical_aid_city.json', 'utf-8'));
 const medicalAidCityMap = {};
 for (const r of medicalAidCityRaw) {
   medicalAidCityMap[`${r.pref}_${r.name}`] = r.age;
 }
 // 市区名のバリアント（ヶ/ケ・郡名除去）でマッチするヘルパー
+// 優先順位: CSV手動確認 > goo.ne.jp市区データ > 都道府県基準値
 function getMedicalAidAge(pref, name) {
   const variants = new Set();
   for (const n of [name, name.replace(/^.+郡/, '')]) {
@@ -97,11 +118,18 @@ function getMedicalAidAge(pref, name) {
     variants.add(n.replace(/ヶ/g, 'ケ'));
     variants.add(n.replace(/ケ/g, 'ヶ'));
   }
+  // 1. CSV手動確認データ（最優先）
+  for (const n of variants) {
+    const v = sourcesMap[`${pref}_${n}`];
+    if (v !== undefined) return v.age;
+  }
+  // 2. goo.ne.jp 市区データ
   for (const n of variants) {
     const v = medicalAidCityMap[`${pref}_${n}`];
     if (v !== undefined) return v;
   }
-  return medicalAidPref[pref] ?? 18; // フォールバック：都道府県基準値
+  // 3. 都道府県基準値（フォールバック）
+  return medicalAidPref[pref] ?? 18;
 }
 // 郡名除去 + ヶ/ケ正規化でマッチングするヘルパー
 function lunchFreeKey(pref, name) {
